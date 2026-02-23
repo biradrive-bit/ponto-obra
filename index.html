@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Sistema Denis Carvalho</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; }
+    #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
+    input { padding: 15px; width: 85%; border-radius: 12px; border: 1px solid #ddd; text-align: center; margin-bottom: 20px; font-size: 1.1em; }
+    .btn-p { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-weight: bold; width: 100%; max-width: 400px; cursor: pointer; font-size: 1.1em; }
+    #canvas { width: 100%; max-width: 450px; border-radius: 20px; border: 3px solid #2c3e50; display: none; margin: auto; background: #000; }
+    .bolinha { width: 12px; height: 12px; border-radius: 50%; background: #28a745; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #28a745; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+    #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 25px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; }
+    #loading { display: none; margin-top: 15px; font-weight: bold; color: #007bff; font-size: 1.1em; }
+    .status-bar { position: fixed; top: 10px; right: 10px; font-size: 0.8em; font-weight: bold; display: flex; align-items: center; background: white; padding: 5px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 1001; }
+  </style>
+</head>
+<body>
+  <div class="status-bar"><div class="bolinha"></div> ONLINE</div>
+
+  <div id="login-screen">
+    <h2 style="color: #2c3e50;">Acesso Denis Carvalho</h2>
+    <input type="password" id="pass-input" placeholder="Sua Senha">
+    <button class="btn-p" style="background:#007bff" onclick="verificarSenha()">ENTRAR</button>
+    <div id="loading">⏳ Conectando à Planilha...</div>
+  </div>
+
+  <div id="app-content" style="display:none;">
+    <h3 style="color: #2c3e50;">🏗️ Ponto Digital</h3>
+    <canvas id="canvas"></canvas>
+    <button id="btn-iniciar" class="btn-p" onclick="forcarAbertura()">▶️ LIGAR CÂMERA</button>
+    <div id="itens-container" style="margin-top: 20px; text-align: left; max-width: 450px; margin: auto;"></div>
+  </div>
+
+  <div id="confirm-box">
+    <span id="nome-exibir" style="font-weight:bold; font-size:1.4em; display:block; margin-bottom:20px; color: #2c3e50;">---</span>
+    <button class="btn-p" style="background:#28a745; width:100%; margin-bottom:10px;" onclick="enviar('PRESENTE')">✅ PRESENTE</button>
+    <button class="btn-p" style="background:#dc3545; width:100%; margin-bottom:10px;" onclick="enviar('FALTA')">❌ FALTA</button>
+    <button class="btn-p" style="background:#6c757d; width:100%" onclick="cancelar()">CANCELAR</button>
+  </div>
+
+  <script>
+    // ==========================================
+    // SUA API DO GOOGLE JÁ CONECTADA AQUI:
+    const URL_API = "https://script.google.com/macros/s/AKfycbz72EnYFJOHmHzTumWJPBhKG7R1gUTBx2nDjdjf06a1lpI5IMLesrCXaN1tVMQu6fio/exec"; 
+    // ==========================================
+
+    let video = document.createElement("video");
+    let canvasElement = document.getElementById("canvas");
+    let canvas = canvasElement.getContext("2d", { willReadFrequently: true });
+    let senhaAtiva = "", qrPendente = "", bloqueio = false;
+
+    function verificarSenha() {
+      const pass = document.getElementById('pass-input').value;
+      if (!pass) return alert("Digite a senha!");
+      
+      document.getElementById('loading').style.display = 'block';
+      
+      fetch(URL_API, {
+        method: 'POST',
+        body: JSON.stringify({ acao: "verificarSenha" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        if (data.sucesso && data.senhas.split(",").includes(pass)) {
+          senhaAtiva = pass;
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('app-content').style.display = 'block';
+        } else { alert("Senha incorreta!"); }
+      })
+      .catch(err => {
+        document.getElementById('loading').style.display = 'none';
+        alert("Erro ao conectar com a planilha. Verifique sua internet.");
+      });
+    }
+
+    async function forcarAbertura() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+        requestAnimationFrame(tick);
+        document.getElementById("btn-iniciar").style.display = "none";
+        canvasElement.style.display = "block";
+      } catch (err) {
+        alert("Erro: Câmera não permitida pelo celular.");
+      }
+    }
+
+    function tocarBip() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        osc.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      } catch(e) {}
+    }
+
+    function tick() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueio) {
+        canvasElement.height = video.videoHeight;
+        canvasElement.width = video.videoWidth;
+        canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        if (code) {
+          bloqueio = true; tocarBip();
+          qrPendente = code.data;
+          let i = qrPendente.indexOf(" ");
+          document.getElementById("nome-exibir").innerText = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
+          document.getElementById("confirm-box").style.display = "block";
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function enviar(status) {
+      document.getElementById("confirm-box").style.display = "none";
+      document.getElementById("btn-iniciar").innerText = "⏳ Gravando...";
+      document.getElementById("btn-iniciar").style.display = "block";
+      document.getElementById("btn-iniciar").style.background = "#6c757d";
+      
+      fetch(URL_API, {
+        method: 'POST',
+        body: JSON.stringify({
+          acao: "registrar",
+          qrData: qrPendente,
+          status: status,
+          senha: senhaAtiva
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("btn-iniciar").style.display = "none";
+        if (data.sucesso) {
+          const div = document.createElement('div');
+          div.style.padding = "10px"; div.style.borderBottom = "1px solid #eee"; div.style.fontWeight = "bold";
+          div.innerText = "✅ " + data.nome + " (" + data.status + ")";
+          document.getElementById('itens-container').prepend(div);
+        } else { alert("Erro ao gravar: " + data.erro); document.getElementById("btn-iniciar").style.display = "block"; document.getElementById("btn-iniciar").innerText = "▶️ LIGAR CÂMERA"; document.getElementById("btn-iniciar").style.background = "#2c3e50";}
+        bloqueio = false;
+      })
+      .catch(err => {
+        alert("Erro de conexão ao enviar!");
+        document.getElementById("btn-iniciar").style.display = "block";
+        document.getElementById("btn-iniciar").innerText = "▶️ LIGAR CÂMERA";
+        document.getElementById("btn-iniciar").style.background = "#2c3e50";
+        bloqueio = false;
+      });
+    }
+
+    function cancelar() {
+      document.getElementById("confirm-box").style.display = "none";
+      setTimeout(() => { bloqueio = false; }, 1000);
+    }
+  </script>
+</body>
+</html>
