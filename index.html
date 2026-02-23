@@ -9,15 +9,23 @@
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
         #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
         input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
-        #canvas { width: 100%; max-width: 450px; margin: auto; border-radius: 15px; border: 2px solid #2c3e50; display:none; background: #000; }
-        .btn-start { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; max-width: 400px; font-size: 1.2em; cursor: pointer; }
+        
+        /* NOVO CONTAINER DA CÂMERA COM TARGET */
+        #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        #canvas { width: 100%; display: block; }
+        .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(40, 167, 69, 0.8); box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
+        .scanner-target::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #39ff14; box-shadow: 0 0 12px #39ff14; animation: scan 2s infinite linear; }
+        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+        /* ----------------------------------- */
+
+        .btn-start { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; max-width: 350px; font-size: 1.2em; cursor: pointer; }
         .btn-login { padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1em; cursor: pointer; width: 100%; }
         #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; max-height: 90vh; overflow-y: auto; }
         .btn-status { padding: 12px; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1em; margin: 5px; width: 100%; cursor: pointer; box-sizing: border-box; }
         .p { background: #28a745; } .f { background: #dc3545; } .fer { background: #ffc107; color: black !important; } .a { background: #17a2b8; } .dec { background: #6f42c1; } .c { background: #6c757d; }
         #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
         .secao-extra { display: none; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 10px; border: 1px dashed #ccc; }
-        #lista-lidos { margin-top: 20px; text-align: left; max-width: 450px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
+        #lista-lidos { margin-top: 20px; text-align: left; max-width: 350px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
         .item-lido { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; color: #333; font-weight: 600; }
         .rodape-fixo { position: fixed; bottom: 0; left: 0; width: 100%; background: #2c3e50; color: white; padding: 15px 0; font-size: 0.8em; font-weight: bold; z-index: 1001; }
         .status-conexao { position: fixed; top: 10px; right: 10px; display: flex; align-items: center; font-size: 0.7em; z-index: 1002; font-weight: bold; }
@@ -40,7 +48,12 @@
 
     <div id="app-content" style="display:none;">
         <h2 style="margin-bottom: 10px; color: #2c3e50;">🏗️ Registro de Ponto</h2>
-        <canvas id="canvas"></canvas>
+        
+        <div id="camera-container">
+            <canvas id="canvas"></canvas>
+            <div class="scanner-target"></div>
+        </div>
+        
         <button id="start-btn" class="btn-start" style="margin-top:10px;" onclick="iniciarLeitor()">▶️ LIGAR CÂMERA</button>
         <div id="lista-lidos">
             <strong>📋 Registrados agora:</strong>
@@ -146,13 +159,20 @@
 
         async function iniciarLeitor() {
             try {
+                if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); }
+
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
                 video.setAttribute("playsinline", true);
                 video.play();
-                requestAnimationFrame(tick);
+                
+                if (!window.tickRodando) {
+                    window.tickRodando = true;
+                    requestAnimationFrame(tick);
+                }
+                
                 document.getElementById("start-btn").style.display = "none";
-                canvasElement.style.display = "block";
+                document.getElementById("camera-container").style.display = "block";
             } catch (err) { alert("Câmera bloqueada pelo celular."); }
         }
 
@@ -235,7 +255,7 @@
                     const img = new Image();
                     img.src = e.target.result;
                     img.onload = () => {
-                        const canvas = document.createElement('canvas');
+                        const canvasImg = document.createElement('canvas');
                         let width = img.width; let height = img.height;
                         const max_size = 1000;
                         if (width > height) {
@@ -243,10 +263,10 @@
                         } else {
                             if (height > max_size) { width *= max_size / height; height = max_size; }
                         }
-                        canvas.width = width; canvas.height = height;
-                        const ctx = canvas.getContext('2d');
+                        canvasImg.width = width; canvasImg.height = height;
+                        const ctx = canvasImg.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        const dataUrlOtimizada = canvas.toDataURL('image/jpeg', 0.7);
+                        const dataUrlOtimizada = canvasImg.toDataURL('image/jpeg', 0.7);
                         enviarDados(statusSelecionado, dataUrlOtimizada, dataI, obs);
                     };
                 };
@@ -304,6 +324,12 @@
             document.getElementById('botoes-principais').style.display = 'block';
             document.getElementById('confirm-content').style.display = 'block';
             qrPendente = "";
+            
+            // Religa se o container estiver visível
+            if (document.getElementById("camera-container").style.display === "block") {
+                iniciarLeitor();
+            }
+
             setTimeout(() => { bloqueioAtivo = false; }, 1000);
         }
 
