@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>LABORATÓRIO - Ponto Digital</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        /* Mantendo seu estilo original */
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #eef2f3; margin: 0; padding: 10px; padding-bottom: 80px; }
+        #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; border-top: 5px solid #ffc107; }
+        input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; }
+        #canvas { width: 100%; display: block; }
+        .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid #28a745; box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
+        .btn-start { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; max-width: 350px; font-size: 1.2em; cursor: pointer; }
+        .btn-login { padding: 15px 30px; background: #ffc107; color: black; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1em; cursor: pointer; width: 100%; }
+        #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; }
+        .btn-status { padding: 12px; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1em; margin: 5px; width: 100%; cursor: pointer; }
+        .p { background: #28a745; } .f { background: #dc3545; } .c { background: #6c757d; }
+        #lista-lidos { margin-top: 20px; text-align: left; max-width: 350px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
+        .item-lido { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; color: #333; font-weight: 600; }
+        .rodape-fixo { position: fixed; bottom: 0; left: 0; width: 100%; background: #2c3e50; color: white; padding: 15px 0; font-size: 0.8em; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <h2 style="color: #ffc107;">🧪 MODO TESTE</h2>
+        <p style="font-size: 0.8em; color: #666;">Gravando em: <b>TESTE_PILOTO</b></p>
+        <input type="password" id="pass-input" placeholder="Sua Senha">
+        <button class="btn-login" id="btn-login-id" onclick="verificarSenha()">ACESSAR LABORATÓRIO</button>
+    </div>
+
+    <div id="app-content" style="display:none;">
+        <h2 style="margin-bottom: 10px; color: #2c3e50;">🏗️ Ponto Digital (Teste)</h2>
+        <p id="nome-encarregado-topo" style="font-weight: bold; color: #28a745;"></p>
+        
+        <div id="camera-container">
+            <canvas id="canvas"></canvas>
+            <div class="scanner-target"></div>
+        </div>
+        
+        <button id="start-btn" class="btn-start" style="margin-top:10px;" onclick="iniciarLeitor()">▶️ LIGAR CÂMERA</button>
+        
+        <div id="lista-lidos">
+            <strong>📋 Registrados por você hoje:</strong>
+            <div id="itens-container"></div>
+        </div>
+        
+        <button onclick="location.reload()" style="margin-top: 20px; background: none; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; font-size: 0.7em;">SAIR / TROCAR USUÁRIO</button>
+        
+        <div class="rodape-fixo">LABORATÓRIO DE TESTES - Denis Carvalho</div>
+    </div>
+
+    <div id="confirm-box">
+        <div id="confirm-content">
+            <span id="nome-exibir" style="font-weight:bold; font-size:1.3em; display:block; margin-bottom:15px;">---</span>
+            <button class="btn-status p" onclick="enviarDados('PRESENTE')">✅ PRESENTE</button>
+            <button class="btn-status f" onclick="enviar
