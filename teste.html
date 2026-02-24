@@ -6,10 +6,9 @@
     <title>LABORATÓRIO - Ponto Digital</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        /* Mantendo seu estilo original */
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #eef2f3; margin: 0; padding: 10px; padding-bottom: 80px; }
         #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; border-top: 5px solid #ffc107; }
-        input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        input { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
         #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; }
         #canvas { width: 100%; display: block; }
         .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid #28a745; box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
@@ -35,21 +34,10 @@
     <div id="app-content" style="display:none;">
         <h2 style="margin-bottom: 10px; color: #2c3e50;">🏗️ Ponto Digital (Teste)</h2>
         <p id="nome-encarregado-topo" style="font-weight: bold; color: #28a745;"></p>
-        
-        <div id="camera-container">
-            <canvas id="canvas"></canvas>
-            <div class="scanner-target"></div>
-        </div>
-        
+        <div id="camera-container"><canvas id="canvas"></canvas><div class="scanner-target"></div></div>
         <button id="start-btn" class="btn-start" style="margin-top:10px;" onclick="iniciarLeitor()">▶️ LIGAR CÂMERA</button>
-        
-        <div id="lista-lidos">
-            <strong>📋 Registrados por você hoje:</strong>
-            <div id="itens-container"></div>
-        </div>
-        
+        <div id="lista-lidos"><strong>📋 Registrados por você hoje:</strong><div id="itens-container"></div></div>
         <button onclick="location.reload()" style="margin-top: 20px; background: none; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; font-size: 0.7em;">SAIR / TROCAR USUÁRIO</button>
-        
         <div class="rodape-fixo">LABORATÓRIO DE TESTES - Denis Carvalho</div>
     </div>
 
@@ -57,4 +45,119 @@
         <div id="confirm-content">
             <span id="nome-exibir" style="font-weight:bold; font-size:1.3em; display:block; margin-bottom:15px;">---</span>
             <button class="btn-status p" onclick="enviarDados('PRESENTE')">✅ PRESENTE</button>
-            <button class="btn-status f" onclick="enviar
+            <button class="btn-status f" onclick="enviarDados('FALTA')">❌ FALTA</button>
+            <button class="btn-status c" onclick="fechar()">CANCELAR</button>
+        </div>
+        <div id="loading" style="display:none;"><h3>⏳ Gravando...</h3></div>
+    </div>
+
+    <script>
+        const URL_API = "https://script.google.com/macros/s/AKfycbwwfudzbd75ftK21MH3ryMQDy0B6ijEITjjklSivoiNAW_EnJ5Xm3l2r0P9oKVv7_cdfQ/exec";
+        let video = document.createElement("video");
+        let canvasElement = document.getElementById("canvas");
+        let canvas = canvasElement.getContext("2d");
+        let qrPendente = "", bloqueioAtivo = false, senhaAtiva = "", encarregadoAtivo = "";
+
+        function verificarSenha() {
+            const pass = document.getElementById('pass-input').value;
+            if(!pass) return alert("Digite a senha");
+            document.getElementById('btn-login-id').innerText = "Processando...";
+            
+            fetch(URL_API, {
+                method: 'POST',
+                mode: 'cors', // Garantindo o modo CORS
+                redirect: 'follow', // Necessário para o Google Apps Script
+                body: JSON.stringify({ acao: "verificarSenha", senhaDigitada: pass })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('btn-login-id').innerText = "ACESSAR LABORATÓRIO";
+                if (data.sucesso && data.senhas.split(",").includes(pass)) {
+                    senhaAtiva = pass;
+                    encarregadoAtivo = data.encarregado;
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'block';
+                    document.getElementById('lista-lidos').style.display = 'block';
+                    document.getElementById('nome-encarregado-topo').innerText = "Encarregado: " + encarregadoAtivo;
+                    buscarRegistrosDoDia(); 
+                } else { alert("Senha Incorreta!"); }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erro de conexão com o Google. Verifique se o Script está como 'Anyone'.");
+                document.getElementById('btn-login-id').innerText = "ACESSAR LABORATÓRIO";
+            });
+        }
+
+        function buscarRegistrosDoDia() {
+            fetch(URL_API + "?encarregado=" + encodeURIComponent(encarregadoAtivo))
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('itens-container');
+                container.innerHTML = "";
+                if (data.sucesso && data.registros.length > 0) {
+                    data.registros.forEach(reg => {
+                        const div = document.createElement('div');
+                        div.className = 'item-lido';
+                        div.innerText = "✅ " + reg.nome + " (" + reg.status + ") - " + reg.hora;
+                        container.appendChild(div);
+                    });
+                }
+            });
+        }
+
+        function enviarDados(status) {
+            document.getElementById('confirm-content').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            fetch(URL_API, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'follow',
+                body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: status, senhaDigitada: senhaAtiva })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.sucesso) buscarRegistrosDoDia();
+                fechar();
+            })
+            .catch(err => { alert("Erro ao salvar."); fechar(); });
+        }
+
+        async function iniciarLeitor() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.play();
+                requestAnimationFrame(tick);
+                document.getElementById("start-btn").style.display = "none";
+                document.getElementById("camera-container").style.display = "block";
+            } catch (e) { alert("Permita a câmera."); }
+        }
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
+                canvasElement.height = video.videoHeight;
+                canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                var code = jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                    bloqueioAtivo = true; qrPendente = code.data;
+                    let i = qrPendente.indexOf(" ");
+                    document.getElementById('nome-exibir').innerText = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
+                    document.getElementById('confirm-box').style.display = 'block';
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function fechar() { 
+            document.getElementById('confirm-box').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('confirm-content').style.display = 'block';
+            qrPendente = "";
+            setTimeout(() => { bloqueioAtivo = false; }, 1500);
+        }
+    </script>
+</body>
+</html>
