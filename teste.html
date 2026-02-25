@@ -8,7 +8,7 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
         #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
-        input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        input, textarea { padding: 12px; width: 85%; font-size: 0.92em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
         #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         #canvas { width: 100%; display: block; }
         .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(40, 167, 69, 0.8); box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
@@ -186,9 +186,9 @@
             document.getElementById('label-dinamico').innerText = "Data do(a) " + status + ":";
             document.getElementById('data-extra').valueAsDate = new Date();
             if (status === 'ATESTADO') {
-                obsInput.placeholder = "Quantidade de dias (Ex: 3 dias)";
+                obsInput.placeholder = "Qtd dias (Ex: 3)";
             } else if (status === 'DECLARACAO') {
-                obsInput.placeholder = "Período ou duração (Ex: 07h às 10h)";
+                obsInput.placeholder = "Período (Ex: 07h às 10h)";
             } else {
                 obsInput.placeholder = "Observação";
             }
@@ -213,7 +213,7 @@
                         const canvasImg = document.createElement('canvas');
                         const max_size = 1000; let w = img.width, h = img.height;
                         if (w > h) { if (w > max_size) { h *= max_size / w; w = max_size; } }
-                        else { if (h > max_size) { w *= max_size / h; h = max_size; } }
+                        else { if (h > max_size) { h *= max_size / h; h = max_size; } }
                         canvasImg.width = w; canvasImg.height = h;
                         canvasImg.getContext('2d').drawImage(img, 0, 0, w, h);
                         enviarFinal(statusSelecionado, canvasImg.toDataURL('image/jpeg', 0.7), document.getElementById('data-extra').value, document.getElementById('obs-extra').value);
