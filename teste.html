@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>Ponto Digital - Obra</title>
+    <title>Ponto Digital - Obra (Lab)</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
@@ -40,7 +40,7 @@
             <div class="scanner-target"></div>
         </div>
         
-        <button id="start-btn" class="btn-start" onclick="iniciarLeitor()">▶️ LIGAR CÂMERA</button>
+        <button id="start-btn" class="btn-start" onclick="iniciarLeitor()">▶️ ABRIR CÂMERA</button>
         
         <div id="lista-lidos">
             <strong>📋 Registrados Hoje:</strong>
@@ -60,7 +60,7 @@
                 <button class="btn-status fer" onclick="abrirExtra('FERIAS')">🌴 FÉRIAS</button>
                 <button class="btn-status a" onclick="abrirExtra('ATESTADO')">📄 ATESTADO</button>
                 <button class="btn-status dec" onclick="abrirExtra('DECLARACAO')">🕒 DECLARAÇÃO</button>
-                <button class="btn-status c" onclick="fechar()">CANCELAR/VOLTAR</button>
+                <button class="btn-status c" onclick="fechar()">CANCELAR</button>
             </div>
             
             <div id="area-extra" class="secao-extra">
@@ -83,7 +83,6 @@
         let canvas = canvasElement.getContext("2d");
         let qrPendente = "", bloqueioAtivo = false, senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
 
-        // FUNÇÃO DO BIP
         function bip() {
             try {
                 let ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -114,7 +113,6 @@
                     document.getElementById('app-content').style.display='block';
                     document.getElementById('lista-lidos').style.display='block';
                     document.getElementById('info-topo').innerText = "Encarregado: " + d.encarregado;
-                    // BIP REMOVIDO DAQUI
                     buscarRegistros();
                 } else { alert("Senha inválida!"); }
             })
@@ -149,20 +147,26 @@
                 if (code) {
                     bloqueioAtivo = true; 
                     qrPendente = code.data;
-                    bip(); // BIP MANTIDO APENAS NO SCAN
+                    bip();
 
                     let i = qrPendente.indexOf(" ");
                     let nomeLido = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
                     document.getElementById('nome-exibir').innerText = nomeLido;
 
                     const listaItens = document.getElementById('itens-container').innerText;
+                    
                     if (listaItens.includes(nomeLido)) {
-                        if (!confirm("⚠️ " + nomeLido + " já foi registrado hoje.\n\nDeseja registrar novamente?")) {
-                            fechar();
-                            return;
-                        }
+                        // O setTimeout impede que o "confirm" trave o render da câmera
+                        setTimeout(function() {
+                            if (!confirm("⚠️ " + nomeLido + " já foi registrado hoje.\n\nDeseja registrar novamente?")) {
+                                fechar();
+                            } else {
+                                document.getElementById('confirm-box').style.display = 'block';
+                            }
+                        }, 100);
+                    } else {
+                        document.getElementById('confirm-box').style.display = 'block';
                     }
-                    document.getElementById('confirm-box').style.display = 'block';
                 }
             }
             requestAnimationFrame(tick);
@@ -223,7 +227,8 @@
             document.getElementById('confirm-content').style.display='block';
             document.getElementById('area-extra').style.display='none';
             document.getElementById('botoes-principais').style.display='block';
-            qrPendente = ""; setTimeout(() => { bloqueioAtivo = false; }, 1500);
+            qrPendente = ""; 
+            setTimeout(() => { bloqueioAtivo = false; }, 1500);
         }
     </script>
 </body>
