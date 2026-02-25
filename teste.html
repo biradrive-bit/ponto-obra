@@ -6,7 +6,6 @@
     <title>Ponto Digital - Obra</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        /* SEU ESTILO ORIGINAL MANTIDO */
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
         #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
         input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
@@ -29,7 +28,7 @@
     <div id="login-screen">
         <h2>Acesso Obra</h2>
         <input type="password" id="pass-input" placeholder="Sua Senha">
-        <button class="btn-login" onclick="verificarSenha()">ENTRAR</button>
+        <button id="btn-login-id" class="btn-login" onclick="verificarSenha()">ENTRAR</button>
     </div>
 
     <div id="app-content" style="display:none;">
@@ -82,9 +81,8 @@
         let video = document.createElement("video");
         let canvasElement = document.getElementById("canvas");
         let canvas = canvasElement.getContext("2d");
-        let qrPendente = "", bloqueioAtivo = false, senhaAtiva = "", encarregadoAtivo = "";
+        let qrPendente = "", bloqueioAtivo = false, senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
 
-        // FUNÇÃO DO BIP - CORRIGIDA PARA NAVEGADORES MODERNOS
         function bip() {
             try {
                 let ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -98,84 +96,104 @@
 
         function verificarSenha() {
             const p = document.getElementById('pass-input').value;
-            fetch(URL_API, { method: 'POST', body: JSON.stringify({ acao: "verificarSenha", senhaDigitada: p }) })
-            .then(r => r.json()).then(d => {
-                if(d.sucesso) {
-                    senhaAtiva = p; encarregadoAtivo = d.encarregado;
+            if(!p) return alert("Digite a senha");
+            
+            document.getElementById('btn-login-id').innerText = "Aguarde...";
+
+            fetch(URL_API, { 
+                method: 'POST', 
+                body: JSON.stringify({ acao: "verificarSenha", senhaDigitada: p }) 
+            })
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('btn-login-id').innerText = "ENTRAR";
+                if(d.sucesso && d.senhas.split(",").includes(p)) {
+                    senhaAtiva = p; 
+                    encarregadoAtivo = d.encarregado;
                     document.getElementById('login-screen').style.display='none';
                     document.getElementById('app-content').style.display='block';
                     document.getElementById('lista-lidos').style.display='block';
                     document.getElementById('info-topo').innerText = "Encarregado: " + d.encarregado;
-                    bip(); // Ativa o áudio no primeiro clique
+                    bip(); 
                     buscarRegistros();
-                } else { alert("Senha inválida"); }
+                } else { 
+                    alert("Senha inválida!"); 
+                }
+            })
+            .catch(err => {
+                document.getElementById('btn-login-id').innerText = "ENTRAR";
+                alert("Erro de conexão com o servidor.");
             });
         }
 
         function buscarRegistros() {
             fetch(URL_API + "?encarregado=" + encodeURIComponent(encarregadoAtivo))
-            .then(r => r.json()).then(d => {
+            .then(r => r.json())
+            .then(d => {
                 const cont = document.getElementById('itens-container');
                 cont.innerHTML = "";
-                d.registros.forEach(reg => {
-                    cont.innerHTML += `<div class="item-lido">✅ ${reg.nome} (${reg.status}) - ${reg.hora}</div>`;
-                });
+                if(d.sucesso && d.registros) {
+                    d.registros.forEach(reg => {
+                        cont.innerHTML += `<div class="item-lido">✅ ${reg.nome} (${reg.status}) - ${reg.hora}</div>`;
+                    });
+                }
             });
         }
 
         function enviarSimples(st) {
             const nomeExibir = document.getElementById('nome-exibir').innerText;
-            // Adiciona na lista antes de enviar (feedback instantâneo)
             const cont = document.getElementById('itens-container');
             const agora = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
             cont.innerHTML = `<div class="item-lido" style="color: blue;">⏳ ${nomeExibir} (${st}) - ${agora}</div>` + cont.innerHTML;
             
             document.getElementById('confirm-content').style.display='none';
             document.getElementById('loading').style.display='block';
 
-            fetch(URL_API, { method: 'POST', body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: st, senhaDigitada: senhaAtiva }) })
-            .then(() => { buscarRegistros(); fechar(); });
+            fetch(URL_API, { 
+                method: 'POST', 
+                body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: st, senhaDigitada: senhaAtiva }) 
+            })
+            .then(() => { buscarRegistros(); fechar(); })
+            .catch(() => { alert("Erro ao registrar"); fechar(); });
         }
 
-        // Funções de Câmera e QR (Mesma lógica sua)
-        async function iniciarLeitor() {
-            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = s; video.play();
-            requestAnimationFrame(tick);
-            document.getElementById("start-btn").style.display="none";
-            document.getElementById("camera-container").style.display="block";
-        }
-
-        function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
-                canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
-                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-                var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
-                if (code) {
-                    bloqueioAtivo = true; qrPendente = code.data;
-                    bip(); // BIP NO SCAN!
-                    let i = qrPendente.indexOf(" ");
-                    document.getElementById('nome-exibir').innerText = (i!==-1) ? qrPendente.substring(i).trim() : qrPendente;
-                    document.getElementById('confirm-box').style.display='block';
-                }
-            }
-            requestAnimationFrame(tick);
-        }
-
-        function fechar() { 
-            document.getElementById('confirm-box').style.display='none';
-            document.getElementById('loading').style.display='none';
-            document.getElementById('confirm-content').style.display='block';
-            document.getElementById('area-extra').style.display='none';
-            document.getElementById('botoes-principais').style.display='block';
-            qrPendente = ""; setTimeout(() => { bloqueioAtivo = false; }, 1500);
-        }
-        
         function abrirExtra(st) {
             statusSelecionado = st;
             document.getElementById('botoes-principais').style.display='none';
             document.getElementById('area-extra').style.display='block';
         }
-    </script>
-</body>
-</html>
+
+        function enviarComFoto() {
+            const arquivo = document.getElementById('input-camera').files[0];
+            const dataI = document.getElementById('data-extra').value;
+            const obs = document.getElementById('obs-extra').value;
+
+            document.getElementById('confirm-content').style.display='none';
+            document.getElementById('loading').style.display='block';
+
+            if (arquivo) {
+                const reader = new FileReader();
+                reader.onload = (e) => enviarFinal(statusSelecionado, e.target.result, dataI, obs);
+                reader.readAsDataURL(arquivo);
+            } else {
+                enviarFinal(statusSelecionado, null, dataI, obs);
+            }
+        }
+
+        function enviarFinal(status, fotoBase64, dataI, obs) {
+            fetch(URL_API, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    acao: "registrar", dados: qrPendente, statusEscolhido: status, 
+                    fotoBase64: fotoBase64, senhaDigitada: senhaAtiva, 
+                    dataInicio: dataI, observacao: obs 
+                })
+            })
+            .then(() => { buscarRegistros(); fechar(); })
+            .catch(() => { alert("Erro ao enviar"); fechar(); });
+        }
+
+        async function iniciarLeitor() {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video
