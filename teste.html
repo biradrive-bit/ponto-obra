@@ -3,20 +3,21 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>LABORATÓRIO - Ponto Digital</title>
+    <title>Ponto Digital - Piloto</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #eef2f3; margin: 0; padding: 10px; padding-bottom: 80px; }
-        #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; border-top: 5px solid #ffc107; }
-        input { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
-        #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
+        #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; border-top: 5px solid #007bff; }
+        input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         #canvas { width: 100%; display: block; }
         .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid #28a745; box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
         .btn-start { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; max-width: 350px; font-size: 1.2em; cursor: pointer; }
-        .btn-login { padding: 15px 30px; background: #ffc107; color: black; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1em; cursor: pointer; width: 100%; }
-        #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; }
+        .btn-login { padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1em; cursor: pointer; width: 100%; }
+        #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; max-height: 90vh; overflow-y: auto; }
         .btn-status { padding: 12px; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1em; margin: 5px; width: 100%; cursor: pointer; }
-        .p { background: #28a745; } .f { background: #dc3545; } .c { background: #6c757d; }
+        .p { background: #28a745; } .f { background: #dc3545; } .fer { background: #ffc107; color: black !important; } .a { background: #17a2b8; } .dec { background: #6f42c1; } .c { background: #6c757d; }
+        .secao-extra { display: none; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 10px; border: 1px dashed #ccc; }
         #lista-lidos { margin-top: 20px; text-align: left; max-width: 350px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
         .item-lido { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; color: #333; font-weight: 600; }
         .rodape-fixo { position: fixed; bottom: 0; left: 0; width: 100%; background: #2c3e50; color: white; padding: 15px 0; font-size: 0.8em; font-weight: bold; }
@@ -25,28 +26,56 @@
 <body>
 
     <div id="login-screen">
-        <h2 style="color: #ffc107;">🧪 MODO TESTE</h2>
-        <p style="font-size: 0.8em; color: #666;">Gravando em: <b>TESTE_PILOTO</b></p>
+        <h2>Acesso Restrito</h2>
         <input type="password" id="pass-input" placeholder="Sua Senha">
-        <button class="btn-login" id="btn-login-id" onclick="verificarSenha()">ACESSAR LABORATÓRIO</button>
+        <button class="btn-login" id="btn-login-id" onclick="verificarSenha()">ENTRAR</button>
     </div>
 
     <div id="app-content" style="display:none;">
-        <h2 style="margin-bottom: 10px; color: #2c3e50;">🏗️ Ponto Digital (Teste)</h2>
-        <p id="nome-encarregado-topo" style="font-weight: bold; color: #28a745;"></p>
-        <div id="camera-container"><canvas id="canvas"></canvas><div class="scanner-target"></div></div>
+        <h2 style="margin-bottom: 5px; color: #2c3e50;">🏗️ Registro de Ponto</h2>
+        <p id="nome-encarregado-topo" style="font-weight: bold; color: #28a745; margin-bottom: 15px; font-size: 0.9em;"></p>
+        
+        <div id="camera-container">
+            <canvas id="canvas"></canvas>
+            <div class="scanner-target"></div>
+        </div>
+        
         <button id="start-btn" class="btn-start" style="margin-top:10px;" onclick="iniciarLeitor()">▶️ LIGAR CÂMERA</button>
-        <div id="lista-lidos"><strong>📋 Registrados por você hoje:</strong><div id="itens-container"></div></div>
-        <button onclick="location.reload()" style="margin-top: 20px; background: none; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; font-size: 0.7em;">SAIR / TROCAR USUÁRIO</button>
-        <div class="rodape-fixo">LABORATÓRIO DE TESTES - Denis Carvalho</div>
+        
+        <div id="lista-lidos">
+            <strong>📋 Registrados por você hoje:</strong>
+            <div id="itens-container"></div>
+        </div>
+        
+        <button onclick="location.reload()" style="margin-top: 25px; background: none; border: 1px solid #ccc; padding: 8px; border-radius: 5px; font-size: 0.8em; cursor: pointer;">SAIR / TROCAR USUÁRIO</button>
+        
+        <div class="rodape-fixo">© 2026 Denis Carvalho - Gestão de Obras</div>
     </div>
 
     <div id="confirm-box">
         <div id="confirm-content">
-            <span id="nome-exibir" style="font-weight:bold; font-size:1.3em; display:block; margin-bottom:15px;">---</span>
-            <button class="btn-status p" onclick="enviarDados('PRESENTE')">✅ PRESENTE</button>
-            <button class="btn-status f" onclick="enviarDados('FALTA')">❌ FALTA</button>
-            <button class="btn-status c" onclick="fechar()">CANCELAR</button>
+            <span id="nome-exibir" style="font-weight:bold; font-size:1.3em; display:block; margin-bottom:15px; color: #2c3e50;">---</span>
+            <div id="botoes-principais">
+                <button class="btn-status p" onclick="prepararEnvio('PRESENTE')">✅ PRESENTE</button>
+                <button class="btn-status f" onclick="prepararEnvio('FALTA')">❌ FALTA</button>
+                <button class="btn-status fer" onclick="abrirExtra('FERIAS')">🌴 FÉRIAS</button>
+                <button class="btn-status a" onclick="abrirExtra('ATESTADO')">📄 ATESTADO</button>
+                <button class="btn-status dec" onclick="abrirExtra('DECLARACAO')">🕒 DECLARAÇÃO</button>
+                <button class="btn-status c" onclick="fechar()">CANCELAR</button>
+            </div>
+            
+            <div id="area-extra" class="secao-extra">
+                <label id="label-dinamico" style="font-size: 0.9em; font-weight: bold; display: block; margin-bottom: 5px; color: #2c3e50;"></label>
+                <input type="date" id="data-extra">
+                <input type="text" id="obs-extra" placeholder="Duração">
+                <div id="container-foto">
+                   <p style="font-size: 0.8em; color: red;"><strong>Documento Obrigatório:</strong></p>
+                   <button type="button" class="btn-status a" onclick="document.getElementById('input-camera').click()">📸 TIRAR FOTO</button>
+                   <input type="file" id="input-camera" accept="image/*" capture="environment" style="display:none" onchange="atualizarTexto(this)">
+                </div>
+                <button class="btn-status p" style="margin-top:15px; background: #007bff;" onclick="validarEEnviarExtra()">CONFIRMAR ENVIO</button>
+                <button class="btn-status c" onclick="voltarParaBotoes()">VOLTAR</button>
+            </div>
         </div>
         <div id="loading" style="display:none;"><h3>⏳ Gravando...</h3></div>
     </div>
@@ -56,12 +85,12 @@
         let video = document.createElement("video");
         let canvasElement = document.getElementById("canvas");
         let canvas = canvasElement.getContext("2d");
-        let qrPendente = "", bloqueioAtivo = false, senhaAtiva = "", encarregadoAtivo = "";
+        let qrPendente = "", bloqueioAtivo = false, currentLat = "0", currentLon = "0", senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
 
         function verificarSenha() {
             const pass = document.getElementById('pass-input').value;
             if(!pass) return alert("Digite a senha");
-            document.getElementById('btn-login-id').innerText = "Processando...";
+            document.getElementById('btn-login-id').innerText = "Aguarde...";
             
             fetch(URL_API, {
                 method: 'POST',
@@ -69,7 +98,7 @@
             })
             .then(res => res.json())
             .then(data => {
-                document.getElementById('btn-login-id').innerText = "ACESSAR LABORATÓRIO";
+                document.getElementById('btn-login-id').innerText = "ENTRAR";
                 if (data.sucesso && data.senhas.split(",").includes(pass)) {
                     senhaAtiva = pass;
                     encarregadoAtivo = data.encarregado;
@@ -77,72 +106,98 @@
                     document.getElementById('app-content').style.display = 'block';
                     document.getElementById('lista-lidos').style.display = 'block';
                     document.getElementById('nome-encarregado-topo').innerText = "Encarregado: " + encarregadoAtivo;
-                    buscarRegistrosDoDia(); 
+                    
+                    buscarRegistrosDoDia();
+                    obterLocalizacao();
                 } else { alert("Senha Incorreta!"); }
             })
-            .catch(err => {
-                alert("Erro de conexão.");
-                document.getElementById('btn-login-id').innerText = "ACESSAR LABORATÓRIO";
-            });
+            .catch(err => { alert("Erro de conexão."); document.getElementById('btn-login-id').innerText = "ENTRAR"; });
         }
 
         function buscarRegistrosDoDia() {
+            const container = document.getElementById('itens-container');
+            container.innerHTML = "Carregando registros...";
             fetch(URL_API + "?encarregado=" + encodeURIComponent(encarregadoAtivo))
             .then(res => res.json())
             .then(data => {
-                const container = document.getElementById('itens-container');
                 container.innerHTML = "";
-                if (data.sucesso && data.registros && data.registros.length > 0) {
+                if (data.sucesso && data.registros.length > 0) {
                     data.registros.forEach(reg => {
                         const div = document.createElement('div');
                         div.className = 'item-lido';
                         div.innerText = "✅ " + reg.nome + " (" + reg.status + ") - " + reg.hora;
                         container.appendChild(div);
                     });
-                } else {
-                    container.innerHTML = "<p style='font-size:0.8em; color:#999;'>Nenhum registro seu hoje.</p>";
-                }
+                } else { container.innerHTML = "<p style='font-size:0.8em; color:#999;'>Nenhum registro seu hoje.</p>"; }
             });
         }
 
-        function enviarDados(status) {
+        function obterLocalizacao() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
+                }, null, {enableHighAccuracy: true});
+            }
+        }
+
+        function abrirExtra(status) {
+            statusSelecionado = status;
+            document.getElementById('area-extra').style.display = 'block';
+            document.getElementById('botoes-principais').style.display = 'none';
+            document.getElementById('label-dinamico').innerText = status === 'FERIAS' ? 'Início das Férias:' : 'Data do Documento:';
+            document.getElementById('container-foto').style.display = status === 'FERIAS' ? 'none' : 'block';
+        }
+
+        function voltarParaBotoes() {
+            document.getElementById('area-extra').style.display = 'none';
+            document.getElementById('botoes-principais').style.display = 'block';
+        }
+
+        function atualizarTexto(el) { if (el.files[0]) alert("Foto selecionada!"); }
+
+        function prepararEnvio(status) {
             document.getElementById('confirm-content').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
+            enviarDados(status, null, "", "");
+        }
+
+        function validarEEnviarExtra() {
+            const arquivo = document.getElementById('input-camera').files[0];
+            const dataI = document.getElementById('data-extra').value;
+            const obs = document.getElementById('obs-extra').value;
             
+            if (statusSelecionado !== 'FERIAS' && !arquivo) return alert("Foto obrigatória!");
+            
+            document.getElementById('confirm-content').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            if (arquivo) {
+                const reader = new FileReader();
+                reader.onload = (e) => enviarDados(statusSelecionado, e.target.result, dataI, obs);
+                reader.readAsDataURL(arquivo);
+            } else { enviarDados(statusSelecionado, null, dataI, obs); }
+        }
+
+        function enviarDados(status, fotoBase64, dataI, obs) {
             fetch(URL_API, {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    acao: "registrar", 
-                    dados: qrPendente, 
-                    statusEscolhido: status, 
-                    senhaDigitada: senhaAtiva,
-                    lat: "0", lon: "0" // Forçando 0 para teste
-                })
+                body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: status, fotoBase64: fotoBase64, lat: currentLat, lon: currentLon, senhaDigitada: senhaAtiva, dataInicio: dataI, observacao: obs })
             })
             .then(res => res.json())
             .then(data => {
-                if(data.sucesso) {
-                    buscarRegistrosDoDia();
-                } else {
-                    alert("Erro ao salvar: " + data.erro);
-                }
+                if(data.sucesso) buscarRegistrosDoDia();
                 fechar();
             })
-            .catch(err => { 
-                alert("Erro de conexão ao salvar."); 
-                fechar(); 
-            });
+            .catch(err => { alert("Erro ao gravar."); fechar(); });
         }
 
         async function iniciarLeitor() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-                video.play();
-                requestAnimationFrame(tick);
-                document.getElementById("start-btn").style.display = "none";
-                document.getElementById("camera-container").style.display = "block";
-            } catch (e) { alert("Câmera bloqueada."); }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            video.play();
+            requestAnimationFrame(tick);
+            document.getElementById("start-btn").style.display = "none";
+            document.getElementById("camera-container").style.display = "block";
         }
 
         function tick() {
@@ -153,8 +208,7 @@
                 var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
                 var code = jsQR(imageData.data, imageData.width, imageData.height);
                 if (code) {
-                    bloqueioAtivo = true; 
-                    qrPendente = code.data;
+                    bloqueioAtivo = true; qrPendente = code.data;
                     let i = qrPendente.indexOf(" ");
                     document.getElementById('nome-exibir').innerText = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
                     document.getElementById('confirm-box').style.display = 'block';
@@ -167,8 +221,10 @@
             document.getElementById('confirm-box').style.display = 'none';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('confirm-content').style.display = 'block';
+            document.getElementById('area-extra').style.display = 'none';
+            document.getElementById('botoes-principais').style.display = 'block';
             qrPendente = "";
-            setTimeout(() => { bloqueioAtivo = false; }, 1500);
+            setTimeout(() => { bloqueioAtivo = false; }, 1200);
         }
     </script>
 </body>
