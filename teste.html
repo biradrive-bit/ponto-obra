@@ -196,4 +196,38 @@
 
         async function iniciarLeitor() {
             try {
-                const s = await navigator.mediaDevices.getUserMedia({ video
+                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = s; video.play();
+                requestAnimationFrame(tick);
+                document.getElementById("start-btn").style.display="none";
+                document.getElementById("camera-container").style.display="block";
+            } catch(e) { alert("Câmera não permitida."); }
+        }
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
+                canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
+                if (code) {
+                    bloqueioAtivo = true; qrPendente = code.data;
+                    bip();
+                    let i = qrPendente.indexOf(" ");
+                    document.getElementById('nome-exibir').innerText = (i!==-1) ? qrPendente.substring(i).trim() : qrPendente;
+                    document.getElementById('confirm-box').style.display='block';
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function fechar() { 
+            document.getElementById('confirm-box').style.display='none';
+            document.getElementById('loading').style.display='none';
+            document.getElementById('confirm-content').style.display='block';
+            document.getElementById('area-extra').style.display='none';
+            document.getElementById('botoes-principais').style.display='block';
+            qrPendente = ""; setTimeout(() => { bloqueioAtivo = false; }, 1500);
+        }
+    </script>
+</body>
+</html>
