@@ -89,6 +89,266 @@
     </div>
 
     <script>
+        // --- PAINEL DE CONTROLE ---
+        const SISTEMA_ATIVO = false; // false para travar o login e redirecionar
+        const URL_VERSAO_ESTAVEL = "https://biradrive-bit.github.io/ponto-obra/index.html"; // Link da versão antiga/estável
+        // ----------------------------------------
+
+        const URL_API = "https://script.google.com/macros/s/AKfycbwwfudzbd75ftK21MH3ryMQDy0B6ijEITjjklSivoiNAW_EnJ5Xm3l2r0P9oKVv7_cdfQ/exec";
+        let video = document.createElement("video");
+        let canvasElement = document.getElementById("canvas");
+        let canvas = canvasElement.getContext("2d", { willReadFrequently: true });
+        let qrPendente = "", bloqueioAtivo = false, currentLat = "0", currentLon = "0", senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
+
+        function tocarBip() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination);
+                o.frequency.value = 880; o.start(); o.stop(ctx.currentTime + 0.1);
+            } catch (e) { }
+        }
+
+        function verificarSenha() {
+            // BLOCO DE SEGURANÇA (O DISJUNTOR)
+            if (!SISTEMA_ATIVO) {
+                alert("🏗️ Sistema em atualização técnica. Redirecionando para versão estável...");
+                window.location.href = URL_VERSAO_ESTAVEL;
+                return;
+            }
+
+            const p = document.getElementById('pass-input').value;
+            if(!p) return alert("Digite a senha");
+            document.getElementById('btn-login-id').innerText = "Aguarde...";
+            fetch(URL_API, { method: 'POST', body: JSON.stringify({ acao: "verificarSenha", senhaDigitada: p }) })
+            .then(res => res.json()).then(data => {
+                document.getElementById('btn-login-id').innerText = "ENTRAR";
+                if (data.sucesso && data.senhas.split(",").includes(p)) {
+                    senhaAtiva = p; encarregadoAtivo = data.encarregado;
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'block';
+                    document.getElementById('lista-lidos').style.display = 'block';
+                    document.getElementById('info-encarregado').innerText = "Encarregado: " + encarregadoAtivo;
+                    buscarRegistrosServidor();
+                    obterLocalizacao();
+                } else { alert("Senha Incorreta!"); }
+            });
+        }
+
+        function obterLocalizacao() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
+                }, null, {enableHighAccuracy: true});
+            }
+        }
+
+        function buscarRegistrosServidor() {
+            fetch(URL_API + "?encarregado=" + encodeURIComponent(encarregadoAtivo))
+            .then(r => r.json()).then(d => {
+                const cont = document.getElementById('itens-container');
+                cont.innerHTML = "";
+                if(d.sucesso && d.registros) {
+                    d.registros.forEach(reg => {
+                        cont.innerHTML += `<div class="item-lido">✅ ${reg.nome} (${reg.status}) - ${reg.hora}</div>`;
+                    });
+                }
+            });
+        }
+
+        async function iniciarLeitor() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream; video.play();
+            requestAnimationFrame(tick);
+            document.getElementById("start-btn").style.display = "none";
+            document.getElementById("camera-container").style.display = "block";
+        }
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
+                canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
+                if (code) {
+                    bloqueioAtivo = true; qrPendente = code.data;
+                    tocarBip();
+                    let i = qrPendente.indexOf(" ");
+                    let nomeLido = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
+                    document.getElementById('nome-exibir').innerText = nomeLido;
+                    if (document.getElementById('itens-container').innerText.includes(nomeLido)) {
+                        setTimeout(() => {
+                            if (!confirm("⚠️ " + nomeLido + " já registrado hoje. Lançar novo status?")) { fechar(); }
+                            else { mostrarConfirmacao(); }
+                        }, 100);
+                    } else { mostrarConfirmacao(); }
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function mostrarConfirmacao() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('confirm-box').style.display = 'block';
+        }
+
+        function abrirExtra(status) {
+            statusSelecionado = status;
+            const obsInput = document.getElementById('obs-extra');
+            document.getElementById('label-dinamico').innerText = "Data do(a) " + status + ":";
+            document.getElementById('data-extra').valueAsDate = new Date();
+            if (status === 'ATESTADO') {
+                obsInput.placeholder = "Qtd dias (Ex: 3)";
+            } else if (status === 'DECLARACAO') {
+                obsInput.placeholder = "Período (Ex: 07h às 10h)";
+            } else {
+                obsInput.placeholder = "Observação";
+            }
+            document.getElementById('botoes-principais').style.display = 'none';
+            document.getElementById('area-extra').style.display = 'block';
+        }
+
+        function prepararEnvio(status) {
+            enviarFinal(status, null, "", "");
+        }
+
+        function validarEEnviarExtra() {
+            const arquivo = document.getElementById('input-camera').files[0] || document.getElementById('input-galeria').files[0];
+            if ((statusSelecionado === 'ATESTADO' || statusSelecionado === 'DECLARACAO') && !arquivo) return alert("⚠️ Foto obrigatória!");
+            document.getElementById('confirm-content').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            if (arquivo) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image(); img.src = e.target.result;
+                    img.onload = () => {
+                        const canvasImg = document.createElement('canvas');
+                        const max_size = 1000; let w = img.width, h = img.height;
+                        if (w > h) { if (w > max_size) { h *= max_size / w; w = max_size; } }
+                        else { if (h > max_size) { w *= max_size / h; h = max_size; } }
+                        canvasImg.width = w; canvasImg.height = h;
+                        canvasImg.getContext('2d').drawImage(img, 0, 0, w, h);
+                        enviarFinal(statusSelecionado, canvasImg.toDataURL('image/jpeg', 0.7), document.getElementById('data-extra').value, document.getElementById('obs-extra').value);
+                    };
+                };
+                reader.readAsDataURL(arquivo);
+            } else { enviarFinal(statusSelecionado, null, document.getElementById('data-extra').value, document.getElementById('obs-extra').value); }
+        }
+
+        function enviarFinal(status, foto, dataI, obs) {
+            fetch(URL_API, {
+                method: 'POST',
+                body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: status, fotoBase64: foto, lat: currentLat, lon: currentLon, senhaDigitada: senhaAtiva, dataInicio: dataI, observacao: obs })
+            }).then(() => { buscarRegistrosServidor(); fechar(); });
+        }
+
+        function fechar() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('confirm-box').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('area-extra').style.display = 'none';
+            document.getElementById('confirm-content').style.display = 'block';
+            document.getElementById('botoes-principais').style.display = 'block';
+            qrPendente = ""; setTimeout(() => { bloqueioAtivo = false; }, 1200);
+        }
+
+        function atualizarTexto(el) { if (el.files[0]) document.getElementById('nome-arquivo').innerText = "✔️ Selecionado: " + el.files[0].name; }
+        function voltarParaBotoes() { document.getElementById('area-extra').style.display = 'none'; document.getElementById('botoes-principais').style.display = 'block'; }
+        window.addEventListener('online', () => { document.getElementById('status-bola').className = 'bolinha online'; document.getElementById('status-texto').innerText = 'ONLINE'; });
+        window.addEventListener('offline', () => { document.getElementById('status-bola').className = 'bolinha offline'; document.getElementById('status-texto').innerText = 'OFFLINE'; });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Ponto Digital - Obra Central</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
+        #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
+        input, textarea { padding: 12px; width: 85%; font-size: 0.92em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        #canvas { width: 100%; display: block; }
+        .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(40, 167, 69, 0.8); box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
+        .scanner-target::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #39ff14; box-shadow: 0 0 12px #39ff14; animation: scan 2s infinite linear; }
+        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+        .btn-start { padding: 20px; background: #2c3e50; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; max-width: 350px; font-size: 1.2em; cursor: pointer; }
+        .btn-login { padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1em; cursor: pointer; width: 100%; }
+        #confirm-box { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 1000; width: 85%; max-width: 350px; max-height: 90vh; overflow-y: auto; }
+        .btn-status { padding: 12px; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1em; margin: 5px; width: 100%; cursor: pointer; }
+        .p { background: #28a745; } .f { background: #dc3545; } .fer { background: #ffc107; color: black !important; } .a { background: #17a2b8; } .dec { background: #6f42c1; } .c { background: #6c757d; }
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+        .secao-extra { display: none; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 10px; border: 1px dashed #ccc; }
+        #lista-lidos { margin-top: 20px; text-align: left; max-width: 350px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
+        .item-lido { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; color: #333; font-weight: 600; }
+        .rodape-fixo { position: fixed; bottom: 0; left: 0; width: 100%; background: #2c3e50; color: white; padding: 15px 0; font-size: 0.8em; font-weight: bold; z-index: 1001; }
+        .status-conexao { position: fixed; top: 10px; right: 10px; display: flex; align-items: center; font-size: 0.7em; z-index: 1002; font-weight: bold; }
+        .bolinha { width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .online { background: #28a745; box-shadow: 0 0 8px #28a745; }
+        .offline { background: #dc3545; box-shadow: 0 0 8px #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="status-conexao">
+        <div id="status-bola" class="bolinha online"></div>
+        <span id="status-texto">ONLINE</span>
+    </div>
+
+    <div id="login-screen">
+        <h2>Acesso Obra</h2>
+        <input type="password" id="pass-input" placeholder="Sua Senha">
+        <button class="btn-login" id="btn-login-id" onclick="verificarSenha()">ENTRAR</button>
+    </div>
+
+    <div id="app-content" style="display:none;">
+        <h2 style="margin-bottom: 5px; color: #2c3e50;">🏗️ Ponto Digital</h2>
+        <p id="info-encarregado" style="font-weight: bold; color: #007bff; margin: 0; margin-bottom: 15px;"></p>
+        <div id="camera-container">
+            <canvas id="canvas"></canvas>
+            <div class="scanner-target"></div>
+        </div>
+        <button id="start-btn" class="btn-start" style="margin-top:10px;" onclick="iniciarLeitor()">▶️ ABRIR CÂMERA</button>
+        <div id="lista-lidos">
+            <strong>📋 Registrados Hoje:</strong>
+            <div id="itens-container"></div>
+        </div>
+        <button onclick="location.reload()" style="margin-top: 20px; background: none; border: 1px solid #ccc; padding: 8px; border-radius: 5px; font-size: 0.8em; cursor: pointer;">TROCAR USUÁRIO</button>
+        <div class="rodape-fixo">© 2026 Denis Carvalho - Gestão de Obras</div>
+    </div>
+
+    <div id="overlay"></div>
+    <div id="confirm-box">
+        <div id="confirm-content">
+            <span id="nome-exibir" style="font-weight:bold; font-size:1.3em; display:block; margin-bottom:15px; color: #2c3e50;">---</span>
+            <div id="botoes-principais">
+                <button class="btn-status p" onclick="prepararEnvio('PRESENTE')">✅ PRESENTE</button>
+                <button class="btn-status f" onclick="prepararEnvio('FALTA')">❌ FALTA</button>
+                <button class="btn-status fer" onclick="abrirExtra('FERIAS')">🌴 FÉRIAS</button>
+                <button class="btn-status a" onclick="abrirExtra('ATESTADO')">📄 ATESTADO</button>
+                <button class="btn-status dec" onclick="abrirExtra('DECLARACAO')">🕒 DECLARAÇÃO</button>
+                <button class="btn-status c" onclick="fechar()">CANCELAR</button>
+            </div>
+            <div id="area-extra" class="secao-extra">
+                <label id="label-dinamico" style="font-size: 0.9em; font-weight: bold; display: block; margin-bottom: 5px;"></label>
+                <input type="date" id="data-extra">
+                <input type="text" id="obs-extra">
+                <div id="container-foto" style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+                   <button type="button" class="btn-status a" onclick="document.getElementById('input-camera').click()">📸 TIRAR FOTO</button>
+                   <input type="file" id="input-camera" accept="image/*" capture="environment" style="display:none" onchange="atualizarTexto(this)">
+                   <button type="button" class="btn-status c" onclick="document.getElementById('input-galeria').click()">🖼️ DA GALERIA</button>
+                   <input type="file" id="input-galeria" accept="image/*" style="display:none" onchange="atualizarTexto(this)">
+                   <p id="nome-arquivo" style="font-size: 0.8em; font-weight: bold; color: #28a745; margin-top: 5px;"></p>
+                </div>
+                <button class="btn-status p" style="margin-top:15px; background: #007bff;" onclick="validarEEnviarExtra()">CONFIRMAR ENVIO</button>
+                <button class="btn-status c" onclick="voltarParaBotoes()">VOLTAR</button>
+            </div>
+        </div>
+        <div id="loading" style="display:none;"><h3>⏳ Gravando...</h3></div>
+    </div>
+
+    <script>
         const URL_API = "https://script.google.com/macros/s/AKfycbwwfudzbd75ftK21MH3ryMQDy0B6ijEITjjklSivoiNAW_EnJ5Xm3l2r0P9oKVv7_cdfQ/exec";
         let video = document.createElement("video");
         let canvasElement = document.getElementById("canvas");
