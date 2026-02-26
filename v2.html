@@ -8,7 +8,7 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 10px; padding-bottom: 80px; }
         #login-screen { padding: 40px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 50px auto; }
-        input, textarea { padding: 12px; width: 85%; font-size: 0.92em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
+        input, textarea { padding: 12px; width: 85%; font-size: 1.1em; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; text-align: center; box-sizing: border-box; }
         #camera-container { position: relative; width: 100%; max-width: 350px; margin: auto; border-radius: 15px; overflow: hidden; border: 3px solid #2c3e50; display: none; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         #canvas { width: 100%; display: block; }
         .scanner-target { position: absolute; top: 50%; left: 50%; width: 65%; height: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(40, 167, 69, 0.8); box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); border-radius: 10px; pointer-events: none; z-index: 10; }
@@ -27,7 +27,6 @@
     </style>
 </head>
 <body>
-
     <div id="login-screen">
         <h2>Acesso Obra</h2>
         <input type="password" id="pass-input" placeholder="Sua Senha">
@@ -83,13 +82,9 @@
     <script>
         const URL_API = "https://script.google.com/macros/s/AKfycbwwfudzbd75ftK21MH3ryMQDy0B6ijEITjjklSivoiNAW_EnJ5Xm3l2r0P9oKVv7_cdfQ/exec";
         let video = document.createElement("video");
-        let canvasElement, canvas;
-
-        window.onload = function() {
-            canvasElement = document.getElementById("canvas");
-            if (canvasElement) canvas = canvasElement.getContext("2d", { willReadFrequently: true });
-        };
-
+        let canvasElement = document.getElementById("canvas");
+        let canvas = canvasElement.getContext("2d", { willReadFrequently: true });
+        
         let qrPendente = "", bloqueioAtivo = false, currentLat = "0", currentLon = "0", senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
         let bloqueioEnvio = false; 
 
@@ -144,60 +139,78 @@
         }
 
         async function iniciarLeitor() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = stream; video.play();
-            requestAnimationFrame(tick);
-            document.getElementById("start-btn").style.display = "none";
-            document.getElementById("camera-container").style.display = "block";
+            try {
+                if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); }
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true);
+                video.play();
+                requestAnimationFrame(tick);
+                document.getElementById("start-btn").style.display = "none";
+                document.getElementById("camera-container").style.display = "block";
+            } catch (err) { alert("Câmera bloqueada."); }
         }
 
-        // MOTOR DA CÂMERA: Mantém o vídeo ativo o tempo todo
         function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                if (canvasElement) {
-                    canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
-                    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-                    
-                    // Só tenta ler QR Code se não houver um popup aberto
-                    if (!bloqueioAtivo) {
-                        var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
-                        if (code) {
-                            bloqueioAtivo = true; qrPendente = code.data;
-                            tocarBip();
-                            let i = qrPendente.indexOf(" ");
-                            let nomeLido = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
-                            document.getElementById('nome-exibir').innerText = nomeLido;
-                            if (document.getElementById('itens-container').innerText.includes(nomeLido)) {
-                                setTimeout(() => {
-                                    if (!confirm("⚠️ " + nomeLido + " já registrado hoje?")) { fechar(); }
-                                    else { mostrarConfirmacao(); }
-                                }, 100);
-                            } else { mostrarConfirmacao(); }
-                        }
-                    }
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
+                canvasElement.height = video.videoHeight;
+                canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
+                if (code) {
+                    bloqueioAtivo = true; qrPendente = code.data;
+                    tocarBip();
+                    let i = qrPendente.indexOf(" ");
+                    document.getElementById('nome-exibir').innerText = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente.trim();
+                    document.getElementById('overlay').style.display = 'block';
+                    document.getElementById('confirm-box').style.display = 'block';
                 }
             }
             requestAnimationFrame(tick);
         }
 
-        function mostrarConfirmacao() {
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('confirm-box').style.display = 'block';
-        }
-
+        // --- FUNÇÃO CORRIGIDA COM EXEMPLOS (PLACEHOLDERS) ---
         function abrirExtra(status) {
             statusSelecionado = status;
-            document.getElementById('label-dinamico').innerText = "Data do(a) " + status + ":";
-            document.getElementById('data-extra').valueAsDate = new Date();
+            const label = document.getElementById('label-dinamico');
+            const obsInput = document.getElementById('obs-extra');
+            const containerFoto = document.getElementById('container-foto');
+            
+            document.getElementById('input-camera').value = "";
+            document.getElementById('input-galeria').value = "";
+            document.getElementById('nome-arquivo').innerText = "";
+            obsInput.value = "";
+
+            if (status === 'ATESTADO') {
+                label.innerText = "Data do Atestado:";
+                obsInput.placeholder = "Quantos dias? (Ex: 3 dias)";
+                containerFoto.style.display = "block";
+            } else if (status === 'DECLARACAO') {
+                label.innerText = "Data da Declaração:";
+                obsInput.placeholder = "Horário (Ex: 07h às 10h)";
+                containerFoto.style.display = "block";
+            } else if (status === 'FERIAS') {
+                label.innerText = "Início das Férias:";
+                obsInput.placeholder = "Duração (Ex: 15 dias)";
+                containerFoto.style.display = "none";
+            }
+
             document.getElementById('botoes-principais').style.display = 'none';
             document.getElementById('area-extra').style.display = 'block';
+            document.getElementById('data-extra').valueAsDate = new Date();
         }
 
-        function prepararEnvio(status) { enviarFinal(status, null, "", ""); }
+        function prepararEnvio(status) {
+            enviarFinal(status, null, "", "");
+        }
 
         function validarEEnviarExtra() {
             const arquivo = document.getElementById('input-camera').files[0] || document.getElementById('input-galeria').files[0];
             if ((statusSelecionado === 'ATESTADO' || statusSelecionado === 'DECLARACAO') && !arquivo) return alert("⚠️ Foto obrigatória!");
+            
+            document.getElementById('confirm-content').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
             if (arquivo) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -219,12 +232,22 @@
         function enviarFinal(status, foto, dataI, obs) {
             if (bloqueioEnvio) return;
             bloqueioEnvio = true;
+
             document.getElementById('confirm-content').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
+
             fetch(URL_API, {
                 method: 'POST',
                 body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: status, fotoBase64: foto, lat: currentLat, lon: currentLon, senhaDigitada: senhaAtiva, dataInicio: dataI, observacao: obs })
-            }).then(() => { buscarRegistrosServidor(); fechar(); });
+            })
+            .then(() => { 
+                buscarRegistrosServidor(); 
+                fechar(); 
+            })
+            .catch(err => {
+                alert("Erro ao gravar.");
+                fechar();
+            });
         }
 
         function fechar() {
@@ -234,13 +257,12 @@
             document.getElementById('area-extra').style.display = 'none';
             document.getElementById('confirm-content').style.display = 'block';
             document.getElementById('botoes-principais').style.display = 'block';
-            qrPendente = ""; bloqueioEnvio = false;
-            // Limpa arquivos
-            document.getElementById('input-camera').value = "";
-            document.getElementById('input-galeria').value = "";
-            document.getElementById('nome-arquivo').innerText = "";
-            // Libera a leitura do QR Code novamente
-            setTimeout(() => { bloqueioAtivo = false; }, 1200);
+            qrPendente = ""; 
+            bloqueioEnvio = false; 
+            if (document.getElementById("camera-container").style.display === "block") { 
+                iniciarLeitor(); 
+            }
+            setTimeout(() => { bloqueioAtivo = false; }, 1000);
         }
 
         function atualizarTexto(el) { if (el.files[0]) document.getElementById('nome-arquivo').innerText = "✔️ " + el.files[0].name; }
