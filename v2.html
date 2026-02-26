@@ -158,10 +158,20 @@
                 canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
                 var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
                 if (code) {
-                    bloqueioAtivo = true; qrPendente = code.data;
+                    let text = code.data;
+                    let i = text.indexOf(" ");
+                    let nomeLido = (i !== -1) ? text.substring(i).trim() : text.trim();
+
+                    // --- MENSAGEM DE ERRO/ALERTA DE DUPLICIDADE ---
+                    if (document.getElementById('itens-container').innerText.includes(nomeLido)) {
+                        if (!confirm("⚠️ " + nomeLido + " já registrado hoje. Deseja lançar outro registro (Ex: Atestado ou Férias)?")) {
+                            return; // Ignora se cancelar
+                        }
+                    }
+
+                    bloqueioAtivo = true; qrPendente = text;
                     tocarBip();
-                    let i = qrPendente.indexOf(" ");
-                    document.getElementById('nome-exibir').innerText = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente.trim();
+                    document.getElementById('nome-exibir').innerText = nomeLido;
                     document.getElementById('overlay').style.display = 'block';
                     document.getElementById('confirm-box').style.display = 'block';
                 }
@@ -169,7 +179,6 @@
             requestAnimationFrame(tick);
         }
 
-        // --- FUNÇÃO CORRIGIDA COM EXEMPLOS (PLACEHOLDERS) ---
         function abrirExtra(status) {
             statusSelecionado = status;
             const label = document.getElementById('label-dinamico');
@@ -257,6 +266,7 @@
             document.getElementById('area-extra').style.display = 'none';
             document.getElementById('confirm-content').style.display = 'block';
             document.getElementById('botoes-principais').style.display = 'block';
+            
             qrPendente = ""; 
             bloqueioEnvio = false; 
             if (document.getElementById("camera-container").style.display === "block") { 
