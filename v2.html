@@ -24,17 +24,9 @@
         #lista-lidos { margin-top: 20px; text-align: left; max-width: 350px; margin-left: auto; margin-right: auto; background: white; border-radius: 10px; padding: 10px; border: 1px solid #ddd; display: none; }
         .item-lido { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; color: #333; font-weight: 600; }
         .rodape-fixo { position: fixed; bottom: 0; left: 0; width: 100%; background: #2c3e50; color: white; padding: 15px 0; font-size: 0.8em; font-weight: bold; z-index: 1001; }
-        .status-conexao { position: fixed; top: 10px; right: 10px; display: flex; align-items: center; font-size: 0.7em; z-index: 1002; font-weight: bold; }
-        .bolinha { width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-        .online { background: #28a745; box-shadow: 0 0 8px #28a745; }
-        .offline { background: #dc3545; box-shadow: 0 0 8px #dc3545; }
     </style>
 </head>
 <body>
-    <div class="status-conexao">
-        <div id="status-bola" class="bolinha online"></div>
-        <span id="status-texto">ONLINE</span>
-    </div>
 
     <div id="login-screen">
         <h2>Acesso Obra</h2>
@@ -93,15 +85,13 @@
         let video = document.createElement("video");
         let canvasElement, canvas;
 
-        // Inicia elementos apenas após carregar a página para evitar tela branca
         window.onload = function() {
             canvasElement = document.getElementById("canvas");
             if (canvasElement) canvas = canvasElement.getContext("2d", { willReadFrequently: true });
         };
 
-        // VARIÁVEIS DE CONTROLE
         let qrPendente = "", bloqueioAtivo = false, currentLat = "0", currentLon = "0", senhaAtiva = "", encarregadoAtivo = "", statusSelecionado = "";
-        let bloqueioEnvio = false; // 🔒 TRAVA ANTI-DUPLICIDADE
+        let bloqueioEnvio = false; 
 
         function tocarBip() {
             try {
@@ -161,24 +151,29 @@
             document.getElementById("camera-container").style.display = "block";
         }
 
+        // MOTOR DA CÂMERA: Mantém o vídeo ativo o tempo todo
         function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && !bloqueioAtivo) {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 if (canvasElement) {
                     canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
                     canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-                    var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
-                    if (code) {
-                        bloqueioAtivo = true; qrPendente = code.data;
-                        tocarBip();
-                        let i = qrPendente.indexOf(" ");
-                        let nomeLido = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
-                        document.getElementById('nome-exibir').innerText = nomeLido;
-                        if (document.getElementById('itens-container').innerText.includes(nomeLido)) {
-                            setTimeout(() => {
-                                if (!confirm("⚠️ " + nomeLido + " já registrado hoje. Lançar novo status?")) { fechar(); }
-                                else { mostrarConfirmacao(); }
-                            }, 100);
-                        } else { mostrarConfirmacao(); }
+                    
+                    // Só tenta ler QR Code se não houver um popup aberto
+                    if (!bloqueioAtivo) {
+                        var code = jsQR(canvas.getImageData(0, 0, canvasElement.width, canvasElement.height).data, canvasElement.width, canvasElement.height);
+                        if (code) {
+                            bloqueioAtivo = true; qrPendente = code.data;
+                            tocarBip();
+                            let i = qrPendente.indexOf(" ");
+                            let nomeLido = (i !== -1) ? qrPendente.substring(i).trim() : qrPendente;
+                            document.getElementById('nome-exibir').innerText = nomeLido;
+                            if (document.getElementById('itens-container').innerText.includes(nomeLido)) {
+                                setTimeout(() => {
+                                    if (!confirm("⚠️ " + nomeLido + " já registrado hoje?")) { fechar(); }
+                                    else { mostrarConfirmacao(); }
+                                }, 100);
+                            } else { mostrarConfirmacao(); }
+                        }
                     }
                 }
             }
@@ -192,23 +187,13 @@
 
         function abrirExtra(status) {
             statusSelecionado = status;
-            const obsInput = document.getElementById('obs-extra');
             document.getElementById('label-dinamico').innerText = "Data do(a) " + status + ":";
             document.getElementById('data-extra').valueAsDate = new Date();
-            if (status === 'ATESTADO') {
-                obsInput.placeholder = "Qtd dias (Ex: 3)";
-            } else if (status === 'DECLARACAO') {
-                obsInput.placeholder = "Período (Ex: 07h às 10h)";
-            } else {
-                obsInput.placeholder = "Observação";
-            }
             document.getElementById('botoes-principais').style.display = 'none';
             document.getElementById('area-extra').style.display = 'block';
         }
 
-        function prepararEnvio(status) {
-            enviarFinal(status, null, "", "");
-        }
+        function prepararEnvio(status) { enviarFinal(status, null, "", ""); }
 
         function validarEEnviarExtra() {
             const arquivo = document.getElementById('input-camera').files[0] || document.getElementById('input-galeria').files[0];
@@ -231,29 +216,15 @@
             } else { enviarFinal(statusSelecionado, null, document.getElementById('data-extra').value, document.getElementById('obs-extra').value); }
         }
 
-        // FUNÇÃO DE ENVIO COM PROTEÇÃO
         function enviarFinal(status, foto, dataI, obs) {
-            if (bloqueioEnvio) return; // 🛡️ Se já estiver enviando, ignora o novo clique
-            
-            bloqueioEnvio = true; // Ativa a trava
+            if (bloqueioEnvio) return;
+            bloqueioEnvio = true;
             document.getElementById('confirm-content').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
-
             fetch(URL_API, {
                 method: 'POST',
                 body: JSON.stringify({ acao: "registrar", dados: qrPendente, statusEscolhido: status, fotoBase64: foto, lat: currentLat, lon: currentLon, senhaDigitada: senhaAtiva, dataInicio: dataI, observacao: obs })
-            })
-            .then(() => { 
-                buscarRegistrosServidor(); 
-                fechar(); 
-                // A trava é liberada dentro da função fechar()
-            })
-            .catch(err => {
-                alert("Erro ao gravar. Tente novamente.");
-                bloqueioEnvio = false; // Libera em caso de erro para tentar de novo
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('confirm-content').style.display = 'block';
-            });
+            }).then(() => { buscarRegistrosServidor(); fechar(); });
         }
 
         function fechar() {
@@ -263,15 +234,17 @@
             document.getElementById('area-extra').style.display = 'none';
             document.getElementById('confirm-content').style.display = 'block';
             document.getElementById('botoes-principais').style.display = 'block';
-            qrPendente = ""; 
-            bloqueioEnvio = false; // 🔓 LIBERA PARA O PRÓXIMO REGISTRO
+            qrPendente = ""; bloqueioEnvio = false;
+            // Limpa arquivos
+            document.getElementById('input-camera').value = "";
+            document.getElementById('input-galeria').value = "";
+            document.getElementById('nome-arquivo').innerText = "";
+            // Libera a leitura do QR Code novamente
             setTimeout(() => { bloqueioAtivo = false; }, 1200);
         }
 
-        function atualizarTexto(el) { if (el.files[0]) document.getElementById('nome-arquivo').innerText = "✔️ Selecionado: " + el.files[0].name; }
+        function atualizarTexto(el) { if (el.files[0]) document.getElementById('nome-arquivo').innerText = "✔️ " + el.files[0].name; }
         function voltarParaBotoes() { document.getElementById('area-extra').style.display = 'none'; document.getElementById('botoes-principais').style.display = 'block'; }
-        window.addEventListener('online', () => { document.getElementById('status-bola').className = 'bolinha online'; document.getElementById('status-texto').innerText = 'ONLINE'; });
-        window.addEventListener('offline', () => { document.getElementById('status-bola').className = 'bolinha offline'; document.getElementById('status-texto').innerText = 'OFFLINE'; });
     </script>
 </body>
 </html>
